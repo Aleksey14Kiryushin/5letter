@@ -1,8 +1,5 @@
 # Border у выбранной кнопки
-
-
-from dis import Instruction
-from tkinter import DISABLED
+import json
 from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -19,7 +16,7 @@ from random import *
 
 # Смена фона
 from kivy.core.window import Window
-from numpy import spacing
+
 Window.clearcolor = ("#ff99ff")
 
 # Variables
@@ -28,9 +25,41 @@ words = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 all_objects = list()
 position_clicked = 0
 counter = 0
-the_hidden_word = "арбуз"
+all_words = ["арбуз"]
+counter_win = 0
+
 result = None
 clear = False
+
+# 278 слов
+
+
+def random_word():
+    global the_hidden_word, all_words
+
+    # считываем данные
+    with open("data.json", "r", encoding='utf-8') as file:
+        data = json.load(file)
+        all_words = data["words"]
+
+    print("LEN", len(all_words))
+    if len(all_words) != 0:
+        the_hidden_word = choice(all_words)
+        print(the_hidden_word)
+        all_words.remove(the_hidden_word)
+        print(all_words)
+        print("LEN", len(all_words))
+
+        # Записываем данные
+        data = {}
+        with open ("data.json", "w", encoding='utf-8') as file:
+            data["words"] = all_words
+            json.dump(data, file, sort_keys = True)
+
+        return True
+        
+    return False
+
 
 class MenuButton(Button):
     def __init__(self, screen, **kwargs):
@@ -38,8 +67,13 @@ class MenuButton(Button):
         self.screen = screen
 
     def on_press(self):
-        self.screen.manager.transition.direction = choice(directions)
-        self.screen.manager.current = "info" 
+        if responce:
+            self.screen.manager.transition.direction = choice(directions)
+            self.screen.manager.current = "info" 
+        else:
+            self.screen.manager.transition.direction = choice(directions)
+            self.screen.manager.current = "end" 
+
 
 class CheckButton(Button):
     def __init__(self, screen, **kwargs):
@@ -49,7 +83,7 @@ class CheckButton(Button):
         self.screen = screen
 
     def on_press(self):
-        global counter, the_hidden_word, result
+        global counter, the_hidden_word, result, counter_win
 
         string = ''
         for i in range(5):
@@ -69,6 +103,8 @@ class CheckButton(Button):
 
             if string == the_hidden_word:
                 counter_symbol = 0
+                counter_win += 1
+
                 for symbol in string:
                     all_objects[(counter*5)+counter_symbol].background_color = ("#00ff00")
                     counter_symbol += 1
@@ -150,7 +186,7 @@ class InfoScr(Screen):
                      size_hint=(.5,.2),
                 )
 
-        instruction = Label(text="Instruction")
+        instruction = Label(text="Что означают цвета букв после Проверки:\n\n· Зеленый - буква расположена в загаданном слове в том же месте, что и введена;\n\n· Синий - введенная буква присутствует в слове, но не соответствует расположению в загаданном;\n\n· Красный - буква не присутсвует в загаданном слове.")
 
         self.btn_begin = Button(
             text="Начать",
@@ -267,23 +303,40 @@ class ResultScr(Screen):
 
         self.menu = MenuButton(self, text="Перейти в главное меню")
 
+        self.lbl_passed = Label(text="Пройдено ...")
+
         layout = BoxLayout(orientation="vertical")
 
         layout.add_widget(self.result_lbl)
+        layout.add_widget(self.lbl_passed)
         layout.add_widget(self.menu)
 
         self.add_widget(layout)
 
     def on_enter(self):
-        global result, the_hidden_word, counter, position_clicked, clear
+        global result, the_hidden_word, counter, position_clicked, clear, responce
 
         if result == "DEFEAT":
             self.result_lbl.text = f"К сожалению, вы проиграли!\nМы загадали слово: {the_hidden_word}..."
+
+        self.lbl_passed.text = f"Пройдено {278 - len(all_words)} из 278 слов"
 
         counter = 0
         position_clicked = 0
         result = None
         clear = True
+        responce = random_word()
+
+class EndScr(Screen):
+    def __init__(self, name="end"): 
+        super().__init__(name=name)
+
+        self.lbl = Label(text="Поздравдяем, Вы прошли игру!\nСтатистика: Вы угадали ... слов из 278\nЖдите обновлений и последующих версий...")
+
+        self.add_widget(self.lbl)
+
+    def on_enter(self):
+        self.lbl.text = f"Поздравдяем, Вы прошли игру!\nСтатистика: Вы угадали {counter_win} из 278 слов\nЖдите обновлений и последующих версий..."
 
 class Game(App):
     def build(self):
@@ -296,10 +349,15 @@ class Game(App):
 
         scr_manager.add_widget(ResultScr(name="result"))
 
+        scr_manager.add_widget(EndScr(name="end"))
+
         # будет показан FirstScr, потому что он добавлен первым. Это можно поменять вот так:
         scr_manager.current = "info"
 
         return scr_manager
+
+# Вызывается единожды
+responce = random_word()
 
 app = Game()
 app.run()
